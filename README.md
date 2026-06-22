@@ -1,0 +1,2 @@
+# Career Post
+**NOTICE:** I am so sorry for anyone who wants to read through this project. 13 year old me was locked in and made a beautiful app, but not with beautiful code. I will spend time to refactor this project, but it will take alot of effort. Look forward to it!
