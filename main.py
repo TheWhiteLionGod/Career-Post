@@ -12,6 +12,7 @@ from typing import Callable, Any
 from emailhandler import sendMail
 from dbhandler import db, Post, User, Comment
 from forms import RegisterForm, LoginForm, CreatePostForm, CreateAboutForm, ContactForm, CommentForm
+from authhandler import terminate
 
 # Flask App
 app = Flask(__name__)
@@ -48,28 +49,6 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
-# Terminating Account
-def terminate():
-    if current_user.terminate:
-        user = db.session.execute(db.select(User).where(User.email==current_user.email)).scalar()
-        posts = db.session.execute(db.select(Post).where(Post.author_id==user.id)).scalars().all()
-        comments = db.session.execute(db.select(Comment).where(Comment.author_id==user.id)).scalars().all()
-        for post in posts:
-            for comment in post.comments:
-                db.session.delete(comment)
-            db.session.delete(post)
-
-        for comment in comments:
-            db.session.delete(comment)
-
-        logout_user()
-        db.session.delete(user)
-        db.session.commit()
-
-        flash('Your Account has been Terminated.')
-        return True
-    return False
-
 
 # Admin Only Decorator
 def admin_only(function: Callable[..., Any]):
@@ -77,7 +56,7 @@ def admin_only(function: Callable[..., Any]):
     def wrapper(*args: tuple[Any, ...], **kwargs: dict[str, Any]):
         if current_user.email != 'aaryan12jul@gmail.com':
             if current_user.is_authenticated and current_user.admin:
-                if terminate():
+                if terminate(current_user, db):
                     return redirect(url_for('register'))
                 return function(*args, **kwargs)
             return abort(403)
@@ -93,7 +72,7 @@ def logged_on(function: Callable[..., Any]):
     @wraps(function)
     def wrapper(*args: tuple[Any, ...], **kwargs: dict[str, Any]):
         if current_user.is_authenticated:
-            if terminate():
+            if terminate(current_user, db):
                 return redirect(url_for('register'))
             return function(*args, **kwargs)
         else:
@@ -188,7 +167,7 @@ def view_post(id: int):
         form = CommentForm()
         
         if form.validate_on_submit():
-            if terminate():
+            if terminate(current_user, db):
                 return redirect(url_for('register'))
             
             if current_user.is_authenticated:
