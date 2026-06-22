@@ -14,13 +14,8 @@ from flask_gravatar import Gravatar
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date
 from functools import wraps
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
 from typing import Callable, Any
-
-# Email Configuration
-EMAIL = os.environ.get('EMAIL')
-API = os.environ.get('SENDGRID')
+from emailhandler import sendMail
 
 # Flask App
 app = Flask(__name__)
@@ -410,15 +405,7 @@ def about(email: str, message: str = ""):
 
             from_user = db.session.execute(db.select(User).where(User.email==from_email)).scalar()
             if from_user:
-                sendmail = Mail(
-                    from_email=EMAIL,
-                    to_emails=email,
-                    subject='Someone Using Career Post Has Tried to Contact You',
-                    html_content=f'Name: {name}<br><br>Email: {from_email}<br><br>Phone Number: {phone}<br><br>Message:<br>{mail}'
-                )
-            
-                sg = SendGridAPIClient(API)
-                sg.send(sendmail)
+                sendMail(name, email, from_email, phone, mail)
                 message = 'Email Successfully Sent'
             else:
                 flash("The Email You Entered Is Invalid")
