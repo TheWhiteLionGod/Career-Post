@@ -47,3 +47,19 @@ def admin_only(db: SQLAlchemy) -> Callable[[Callable[..., Any]], Callable[..., A
             return abort(403)
         return wrapper
     return outerWrapper
+
+# Authenticated Users Only Decorator
+def logged_on(db: SQLAlchemy) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    @wraps(logged_on)
+    def outerWrapper(function: Callable[..., Any]):
+        @wraps(function)
+        def wrapper(*args: tuple[Any, ...], **kwargs: dict[str, Any]) -> Any:
+            if current_user.is_authenticated:
+                if terminate(current_user, db):
+                    return redirect(url_for('register'))
+                return function(*args, **kwargs)
+            else:
+                flash('You Need to Login First')
+                return redirect(url_for('login'))
+        return wrapper
+    return outerWrapper
