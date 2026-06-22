@@ -12,7 +12,7 @@ from typing import Callable, Any
 from emailhandler import sendMail
 from dbhandler import db, Post, User, Comment
 from forms import RegisterForm, LoginForm, CreatePostForm, CreateAboutForm, ContactForm, CommentForm
-from authhandler import terminate
+from authhandler import terminate, admin_only
 
 # Flask App
 app = Flask(__name__)
@@ -48,24 +48,6 @@ db.init_app(app)
 # Creating Tables in Database
 with app.app_context():
     db.create_all()
-
-
-# Admin Only Decorator
-def admin_only(function: Callable[..., Any]):
-    @wraps(function)
-    def wrapper(*args: tuple[Any, ...], **kwargs: dict[str, Any]):
-        if current_user.email != 'aaryan12jul@gmail.com':
-            if current_user.is_authenticated and current_user.admin:
-                if terminate(current_user, db):
-                    return redirect(url_for('register'))
-                return function(*args, **kwargs)
-            return abort(403)
-        else:
-            user = db.get_or_404(User, 1)
-            user.admin = True
-            db.session.commit()
-            return function(*args, **kwargs)
-    return wrapper
 
 # Authenticated Users Only Decorator
 def logged_on(function: Callable[..., Any]):
@@ -385,7 +367,7 @@ def theme(make: str):
 
 # Making Admin Route
 @app.route('/make-admin/<email>')
-@admin_only
+@admin_only(db)
 def make_admin(email: Str):
     verified: bool = session.get('delete', False)
     if not verified:
@@ -398,7 +380,7 @@ def make_admin(email: Str):
 
 # Make Premium Route
 @app.route('/make-premium/<email>')
-@admin_only
+@admin_only(db)
 def make_premium(email: str):
     verified = session.get('delete', False)
     if not verified:
@@ -411,7 +393,7 @@ def make_premium(email: str):
 
 # Remove Admin Route
 @app.route('/remove-admin/<email>')
-@admin_only
+@admin_only(db)
 def remove_admin(email: str):
     verified = session.get('delete', False)
     if not verified:
@@ -424,7 +406,7 @@ def remove_admin(email: str):
 
 # Remove Premium Route
 @app.route('/remove-premium/<email>')
-@admin_only
+@admin_only(db)
 def remove_premium(email: str):
     verified = session.get('delete', False)
     if not verified:

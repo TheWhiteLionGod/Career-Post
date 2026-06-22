@@ -1,7 +1,11 @@
-from typing import Sequence
+from typing import Sequence, Callable, Any
 from dbhandler import User, Post, Comment, SQLAlchemy
-from flask_login import logout_user
-from flask import flash
+from flask_login import logout_user, current_user
+from flask import flash, redirect, abort, url_for
+from functools import wraps
+import os
+
+EMAIL = os.environ.get('EMAIL')
 
 # Terminating Account
 def terminate(user: User, db: SQLAlchemy) -> bool:
@@ -25,3 +29,21 @@ def terminate(user: User, db: SQLAlchemy) -> bool:
 
     flash('Your Account has been Terminated.')
     return True
+
+# Admin Only Decorator
+def admin_only(db: SQLAlchemy) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    @wraps(admin_only)
+    def outerWrapper(function: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(function)
+        def wrapper(*args: tuple[Any, ...], **kwargs: dict[str, Any]) -> Any:
+            if current_user.email == EMAIL:
+                current_user.admin = True
+                db.session.commit()
+            
+            if current_user.is_authenticated and current_user.admin:
+                if terminate(current_user, db):
+                    return redirect(url_for('register'))
+                return function(*args, **kwargs)
+            return abort(403)
+        return wrapper
+    return outerWrapper
