@@ -16,6 +16,7 @@ from datetime import datetime, date
 from functools import wraps
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+from typing import Callable, Any
 
 # Email Configuration
 EMAIL = os.environ.get('EMAIL')
@@ -36,7 +37,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 
 @login_manager.user_loader
-def load_user(user_id):
+def load_user(user_id: int):
     return db.get_or_404(User, user_id)
 
 # Gravatar
@@ -166,9 +167,9 @@ def terminate():
 
 
 # Admin Only Decorator
-def admin_only(function):
+def admin_only(function: Callable[..., Any]):
     @wraps(function)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: tuple[Any, ...], **kwargs: dict[str, Any]):
         if current_user.email != 'aaryan12jul@gmail.com':
             if current_user.is_authenticated and current_user.admin:
                 if terminate():
@@ -183,9 +184,9 @@ def admin_only(function):
     return wrapper
 
 # Authenticated Users Only Decorator
-def logged_on(function):
+def logged_on(function: Callable[..., Any]):
     @wraps(function)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: tuple[Any, ...], **kwargs: dict[str, Any]):
         if current_user.is_authenticated:
             if terminate():
                 return redirect(url_for('register'))
@@ -273,7 +274,7 @@ def posts():
 
 # View Specified Post
 @app.route('/view-post/<id>', methods=['GET', 'POST'])
-def view_post(id):
+def view_post(id: int):
     post = db.get_or_404(Post, id)
 
     if post:
@@ -341,7 +342,7 @@ def create_post():
 # Edit Post
 @app.route('/edit-post/<email>/<id>', methods=['GET', 'POST'])
 @logged_on
-def edit_post(email, id):
+def edit_post(email: str, id: int):
     if current_user.email == email:
         user = db.session.execute(db.select(User).where(User.email==email)).scalar()
         posts = db.session.execute(db.select(Post).where(Post.author_id==user.id)).scalars().all()
@@ -369,9 +370,9 @@ def edit_post(email, id):
 # Deleting Post
 @app.route('/delete/<email>/<id>')
 @logged_on
-def delete_post(email, id):
+def delete_post(email: str, id: int):
     if current_user.email == email or current_user.admin:
-        verified = session.get('delete', False)
+        verified: bool = session.get('delete', False)
         if not verified:
             return redirect(url_for('confirm', target=url_for('delete_post', email=email, id=id)))
 
@@ -388,7 +389,7 @@ def delete_post(email, id):
 # About Page Route
 @app.route('/<email>', methods=['GET', 'POST'])
 @app.route('/<email>/<message>')
-def about(email, message=''):
+def about(email: str, message: str = ""):
     user = db.session.execute(db.select(User).where(User.email==email)).scalar()
     if user:
         posts = db.session.execute(db.select(Post).where(Post.author_id==user.id)).scalars().all()
@@ -428,7 +429,7 @@ def about(email, message=''):
 # Edit About Page
 @app.route('/edit-about/<email>', methods=['GET', 'POST'])
 @logged_on
-def edit_about(email):
+def edit_about(email: str):
     if current_user.email == email:
         user = db.session.execute(db.select(User).where(User.email==email)).scalar()
         posts = db.session.execute(db.select(Post).where(Post.author_id==user.id)).scalars().all()
@@ -444,7 +445,7 @@ def edit_about(email):
 # Delete Account Route
 @app.route('/delete/<email>')
 @logged_on
-def delete_account(email):
+def delete_account(email: str):
     if current_user.email == email or current_user.admin:
         verified = session.get('delete', False)
         if not verified:
@@ -460,10 +461,10 @@ def delete_account(email):
 # Delete Comments Route
 @app.route('/delete-comment/<id>')
 @logged_on
-def delete_comment(id):
+def delete_comment(id: int):
     comment = db.get_or_404(Comment, id)
     if current_user.admin or current_user.id == comment.author_id or comment.post.author.email == current_user.email:
-        verified = session.get('delete', False)
+        verified: bool = session.get('delete', False)
         if not verified:
             return redirect(url_for('confirm', target=url_for('delete_comment', id=id)))
         
@@ -477,7 +478,7 @@ def delete_comment(id):
 @app.route('/confirm', methods=['GET', 'POST'])
 @logged_on
 def confirm():
-    target = request.args.get('target')
+    target: str = request.args.get('target')
     if request.method == 'GET':
         return render_template('confirm.html', dark_mode=dark_mode, year=year, logged_in=current_user.is_authenticated, user=current_user, post='', target=target)
     elif request.method == 'POST':
@@ -492,13 +493,13 @@ def confirm():
 # Search Route
 @app.route('/search/')
 def search():
-    query = request.args.get('query').title()
+    query: str = request.args.get('query').title()
     results = Post.query.filter(Post.title.contains(query)).all()
     return render_template('posts.html', posts=list(results), dark_mode=dark_mode, count_target=20, year=year, title=query, logged_in=current_user.is_authenticated, user=current_user)
 
 # Change Theme
 @app.route('/theme/<make>')
-def theme(make):
+def theme(make: str):
     global dark_mode
     if make == 'True':
         dark_mode = True
@@ -509,8 +510,8 @@ def theme(make):
 # Making Admin Route
 @app.route('/make-admin/<email>')
 @admin_only
-def make_admin(email):
-    verified = session.get('delete', False)
+def make_admin(email: Str):
+    verified: bool = session.get('delete', False)
     if not verified:
         return redirect(url_for('confirm', target=url_for('make_admin', email=email)))
 
@@ -522,7 +523,7 @@ def make_admin(email):
 # Make Premium Route
 @app.route('/make-premium/<email>')
 @admin_only
-def make_premium(email):
+def make_premium(email: str):
     verified = session.get('delete', False)
     if not verified:
         return redirect(url_for('confirm', target=url_for('make_premium', email=email)))
@@ -535,7 +536,7 @@ def make_premium(email):
 # Remove Admin Route
 @app.route('/remove-admin/<email>')
 @admin_only
-def remove_admin(email):
+def remove_admin(email: str):
     verified = session.get('delete', False)
     if not verified:
         return redirect(url_for('confirm', target=url_for('remove_admin', email=email)))
@@ -548,7 +549,7 @@ def remove_admin(email):
 # Remove Premium Route
 @app.route('/remove-premium/<email>')
 @admin_only
-def remove_premium(email):
+def remove_premium(email: str):
     verified = session.get('delete', False)
     if not verified:
         return redirect(url_for('confirm', target=url_for('remove_premium', email=email)))
