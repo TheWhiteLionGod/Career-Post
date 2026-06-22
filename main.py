@@ -2,10 +2,7 @@
 import os
 from flask import Flask, render_template, redirect, url_for, flash, abort, request, session
 from flask_bootstrap import Bootstrap5
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import Integer, String, Text, Boolean
-from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user
+from flask_login import login_user, LoginManager, current_user, logout_user
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField, PasswordField, TextAreaField
 from wtforms.validators import DataRequired, Email
@@ -16,6 +13,7 @@ from datetime import datetime, date
 from functools import wraps
 from typing import Callable, Any
 from emailhandler import sendMail
+from dbhandler import db, Post, User, Comment
 
 # Flask App
 app = Flask(__name__)
@@ -44,55 +42,9 @@ year = datetime.now().year
 # Dark Mode
 dark_mode = True
 
-# Database Template
-class Base(DeclarativeBase):
-    pass
-
 # Creating Database
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DB_URI')
-db = SQLAlchemy(model_class=Base)
 db.init_app(app)
-
-# Post Database
-class Post(db.Model):
-    __tablename__ = "posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    title: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
-    subtitle: Mapped[str] = mapped_column(String(250), nullable=False)
-    date: Mapped[str] = mapped_column(String(250), nullable=False)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
-    img_url: Mapped[str] = mapped_column(String, nullable=True)
-
-    author_id: Mapped[int] = mapped_column(Integer, db.ForeignKey("users.id"))
-    author: Mapped['User'] = relationship("User", back_populates="posts")
-    comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="post")
-
-# User Database
-class User(db.Model, UserMixin):
-    __tablename__ = "users"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(250), nullable=False)
-    email: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
-    password: Mapped[str] = mapped_column(String, nullable=False)
-    about_text: Mapped[str] = mapped_column(Text, nullable=False, default=f"Hello, It is nice to Meet You!")
-
-    admin: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    premium: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    terminate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-
-    posts: Mapped[list["Post"]] = relationship("Post", back_populates="author")
-    comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="author")
-
-# Commenting System
-class Comment(db.Model):
-    __tablename__ = "comments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    text: Mapped[int] = mapped_column(Text, nullable=False)
-
-    author_id: Mapped[int] = mapped_column(Integer, db.ForeignKey("users.id"), unique=False)
-    author: Mapped["User"] = relationship("User", back_populates="comments")
-    post_id: Mapped[int] = mapped_column(Integer, db.ForeignKey("posts.id"), unique=False)
-    post: Mapped["Post"] = relationship("Post", back_populates="comments")
 
 # Creating Tables in Database
 with app.app_context():
