@@ -35,3 +35,11 @@ dependencies = [
     "werkzeug==3.0.0",
     "wtforms==3.0.1",
 ]
+
+[dependency-groups]
+dev = [
+    "autopep8>=2.3.2",
+    "flake8>=7.3.0",
+    "mypy>=1.20.1",
+    "types-wtforms>=3.2.1.20260518",
+]

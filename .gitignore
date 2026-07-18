@@ -1,3 +1,5 @@
-my_env/
+.venv/
 instance/
 __pycache__/
+.mypy_cache/
+.vscode/
