@@ -11,14 +11,11 @@ from flask import (
     Response,
 )
 from flask_bootstrap import Bootstrap5  # type: ignore[import-untyped]
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import Integer, String, Text, Boolean # type: ignore[import-untyped]
-from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user
+from flask_login import login_user, LoginManager, current_user, logout_user  # type: ignore[import-untyped]
 from flask_wtf import FlaskForm  # type: ignore[import-untyped]
 from wtforms import StringField, SubmitField, PasswordField, TextAreaField
-from wtforms.validators import DataRequired, Email # type: ignore[import-untyped]
-from flask_ckeditor import CKEditor, CKEditorField
+from wtforms.validators import DataRequired, Email  # type: ignore[import-untyped]
+from flask_ckeditor import CKEditor, CKEditorField  # type: ignore[import-untyped]
 from flask_gravatar import Gravatar  # type: ignore[import-untyped]
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date
@@ -26,44 +23,65 @@ from functools import wraps
 from sendgrid import SendGridAPIClient  # type: ignore[import-untyped]
 from sendgrid.helpers.mail import Mail  # type: ignore[import-untyped]
 from werkzeug.wrappers.response import Response as WerkzeugResponse
-from typing import Any, Callable
+from typing import Any, Callable, cast
 import os
 
+from dbhandler import (
+    User,
+    init_app,
+    get_user_by_id,
+    get_user_by_email,
+    create_user_account,
+    update_user_about,
+    mark_user_for_termination,
+    terminate_user_data,
+    set_user_admin,
+    set_user_premium,
+    get_all_posts,
+    get_post_by_id,
+    get_post_by_title,
+    get_posts_by_author,
+    add_new_post,
+    update_post_details,
+    delete_post_and_comments,
+    get_comment_by_id,
+    add_new_comment,
+    delete_single_comment,
+    search_posts,
+)
+
 type RouteResponse = tuple[Response | WerkzeugResponse | str, int]
+cast(User, current_user)
 
-if (EMAIL := os.environ.get('EMAIL')) is None:
-    raise ValueError("EMAIL environment variable is not set")
+EMAIL: str | None = os.environ.get('EMAIL')
+assert isinstance(EMAIL, str), "EMAIL environment variable is not set"
 
-if (API := os.environ.get('SENDGRID')) is None:
-    raise ValueError("SENDGRID environment variable is not set")
+API: str | None = os.environ.get('SENDGRID')
+assert isinstance(API, str), "SENDGRID environment variable is not set"
+
+DB_URI: str | None = os.getenv('DB_URI')
+assert isinstance(DB_URI, str), "DB_URI environment variable is not set"
+
+FLASK_KEY: str | None = os.environ.get('FLASK_KEY')
+assert isinstance(FLASK_KEY, str), "FLASK_KEY environment variable is not set"
 
 app: Flask = Flask(__name__)
-if (flask_key := os.environ.get('FLASK_KEY')) is None:
-    raise ValueError("FLASK_KEY environment variable is not set")
-app.secret_key = flask_key
+app.secret_key = FLASK_KEY
 
 ckeditor: CKEditor = CKEditor(app)
 
 bootstrap: Bootstrap5 = Bootstrap5(app)
 
 login_manager: LoginManager = LoginManager()
-login_manager.init_app(app)
+login_manager.init_app(app)  # type: ignore[untyped-function]
 
-class Base(DeclarativeBase):
-    """Base class for SQLAlchemy declarative models."""
-    pass
-
-if (db_uri := os.environ.get('DB_URI')) is None:
-    raise ValueError("DB_URI environment variable is not set")
-app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
-db: SQLAlchemy = SQLAlchemy(model_class=Base)
-db.init_app(app)
+init_app(app, DB_URI)
 
 
 @login_manager.user_loader  # type: ignore[untyped-decorator]
 def load_user(user_id: str) -> User | None:
     """Load a user given their ID for Flask-Login."""
-    return db.get_or_404(User, user_id)
+    return get_user_by_id(user_id)
 
 
 gravatar: Gravatar = Gravatar(
@@ -79,60 +97,6 @@ gravatar: Gravatar = Gravatar(
 year: int = datetime.now().year
 
 dark_mode: bool = True
-
-
-class Post(db.Model):  # type: ignore[name-defined, misc]
-    """Post model representing blog posts."""
-    __tablename__: str = "posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    title: Mapped[str] = mapped_column(
-        String(250), unique=True, nullable=False)
-    subtitle: Mapped[str] = mapped_column(String(250), nullable=False)
-    date: Mapped[str] = mapped_column(String(250), nullable=False)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
-    img_url: Mapped[str | None] = mapped_column(String, nullable=True)
-
-    author_id: Mapped[int] = mapped_column(Integer, db.ForeignKey("users.id"))
-    author: Mapped['User'] = relationship("User", back_populates="posts")
-    comments: Mapped[list["Comment"]] = relationship(
-        "Comment", back_populates="post")
-
-
-class User(db.Model, UserMixin):  # type: ignore[name-defined, misc]
-    """User model representing application users."""
-    __tablename__: str = "users"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(250), nullable=False)
-    email: Mapped[str] = mapped_column(
-        String(250), unique=True, nullable=False)
-    password: Mapped[str] = mapped_column(String, nullable=False)
-    about_text: Mapped[str] = mapped_column(
-        Text, nullable=False, default="Hello, it's nice to meet you!")
-
-    admin: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    premium: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    terminate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-
-    posts: Mapped[list["Post"]] = relationship("Post", back_populates="author")
-    comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="author")
-
-
-class Comment(db.Model):  # type: ignore[name-defined, misc]
-    """Comment model representing comments on posts."""
-    __tablename__: str = "comments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
-
-    author_id: Mapped[int] = mapped_column(
-        Integer, db.ForeignKey("users.id"), unique=False)
-    author: Mapped["User"] = relationship("User", back_populates="comments")
-    post_id: Mapped[int] = mapped_column(
-        Integer, db.ForeignKey("posts.id"), unique=False)
-    post: Mapped["Post"] = relationship("Post", back_populates="comments")
-
-
-with app.app_context():
-    db.create_all()
 
 
 class RegisterForm(FlaskForm):  # type: ignore[misc]
@@ -197,49 +161,34 @@ class CommentForm(FlaskForm):  # type: ignore[misc]
 
 def terminate() -> bool:
     """Teminates current user if they should be"""
-    if current_user.terminate:
-        user: User | None = db.session.execute(
-            db.select(User).where(
-                User.email == current_user.email)).scalar()
-        if user is not None:
-            posts = db.session.execute(
-                db.select(Post).where(
-                    Post.author_id == user.id)).scalars().all()
-            comments = db.session.execute(
-                db.select(Comment).where(
-                    Comment.author_id == user.id)).scalars().all()
-            for post in posts:
-                for comment in post.comments:
-                    db.session.delete(comment)
-                db.session.delete(post)
+    if not current_user.terminate:
+        return False
 
-            for comment in comments:
-                db.session.delete(comment)
+    user: User | None = get_user_by_email(current_user.email)
+    if user is None:
+        return False
 
-            logout_user()
-            db.session.delete(user)
-            db.session.commit()
-
-            flash('Your Account has been Terminated.')
-            return True
-    return False
+    logout_user()
+    terminate_user_data(user)
+    flash('Your Account has been Terminated.')
+    return True
 
 
 def admin_only[F: Callable[..., RouteResponse]](function: F) -> F:
     """Decorator to restrict access to admin users only."""
     @wraps(function)
     def wrapper(*args: tuple[Any, ...], **kwargs: dict[str, Any]) -> RouteResponse:
-        if current_user.email != EMAIL:
-            if current_user.is_authenticated and current_user.admin:
-                if terminate():
-                    return redirect(url_for('register')), 302
-                return function(*args, **kwargs)
-            return abort(403)
-        else:
-            user: User = db.get_or_404(User, 1)
-            user.admin = True
-            db.session.commit()
+        if current_user.email == EMAIL:
+            set_user_admin(EMAIL, True)
             return function(*args, **kwargs)
+
+        if not (current_user.is_authenticated and current_user.admin):
+            return abort(403)
+
+        if terminate():
+            return redirect(url_for('register')), 302
+
+        return function(*args, **kwargs)
     return wrapper  # type: ignore[return-value]
 
 
@@ -247,22 +196,21 @@ def logged_on[F: Callable[..., RouteResponse]](function: F) -> F:
     """Decorator to require a user be logged in."""
     @wraps(function)
     def wrapper(*args: Any, **kwargs: Any) -> RouteResponse:
-        if current_user.is_authenticated:
-            if terminate():
-                return redirect(url_for('register')), 302
-            return function(*args, **kwargs)
-        else:
+        if not current_user.is_authenticated:
             flash('You Need to Login First')
             return redirect(url_for('login')), 302
+
+        if terminate():
+            return redirect(url_for('register')), 302
+
+        return function(*args, **kwargs)
     return wrapper  # type: ignore[return-value]
 
 
 @app.route('/')
 def homepage() -> RouteResponse:
     """Render the homepage with recent posts."""
-    posts = db.session.execute(
-        db.select(Post).order_by(
-            Post.id)).scalars().all()
+    posts = get_all_posts()
     return (
         render_template(
             'index.html',
@@ -284,48 +232,43 @@ def register() -> RouteResponse:
     """Returns register page / form"""
     premium: bool = bool(request.args.get('premium'))
     form = RegisterForm()
-    if form.validate_on_submit():
-        email = form.email.data or ""
-        user = db.session.execute(
-            db.select(User).where(
-                User.email == email)).scalar()
+    if not form.validate_on_submit():  # type: ignore[untyped-function]
+        return render_template(
+            "form.html", form=form, active3="active", year=year, dark_mode=dark_mode,
+            title="Register", logged_in=current_user.is_authenticated, user=current_user
+        ), 200
 
-        if not user:
-            if form.password.data == form.reenter_pass.data:
-                name = form.name.data or ""
-                password = generate_password_hash(
-                    password=form.password.data or "",
-                    method='pbkdf2:sha256',
-                    salt_length=8)
+    email = form.email.data or ""
+    user = get_user_by_email(email)
 
-                if premium:
-                    new_user = User(
-                        email=email,
-                        name=name,
-                        password=password,
-                        admin=False,
-                        premium=True
-                    )
-                else:
-                    new_user = User(
-                        email=email,
-                        name=name,
-                        password=password,
-                        admin=False,
-                        premium=False
-                    )
+    if user:
+        flash("The Email You Entered Already Exists")
+        return redirect('login'), 302
 
-                db.session.add(new_user)
-                db.session.commit()
+    if form.password.data != form.reenter_pass.data:
+        flash("The Passwords You Entered Do Not Match")
+        return render_template(
+            "form.html", form=form, active3="active", year=year, dark_mode=dark_mode,
+            title="Register", logged_in=current_user.is_authenticated, user=current_user
+        ), 200
 
-                login_user(new_user)
-                return redirect(url_for('posts')), 302
-            flash("The Passwords You Entered Do Not Match")
-        else:
-            flash("The Email You Entered Already Exists")
-            return redirect('login'), 302
-    return render_template("form.html", form=form, active3="active", year=year, dark_mode=dark_mode,
-                           title="Register", logged_in=current_user.is_authenticated, user=current_user), 200
+    name = form.name.data or ""
+    password = generate_password_hash(
+        password=form.password.data or "",
+        method='pbkdf2:sha256',
+        salt_length=8
+    )
+
+    new_user = create_user_account(
+        name=name,
+        email=email,
+        password=password,
+        premium=premium,
+        admin=False
+    )
+
+    login_user(new_user)
+    return redirect(url_for('posts')), 302
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -333,11 +276,9 @@ def login() -> RouteResponse:
     """Returns login page / form"""
     form = LoginForm()
 
-    if form.validate_on_submit():
+    if form.validate_on_submit():  # type: ignore[untyped-function]
         email = form.email.data or ""
-        user = db.session.execute(
-            db.select(User).where(
-                User.email == email)).scalar()
+        user = get_user_by_email(email)
 
         if user and check_password_hash(
                 pwhash=user.password,
@@ -346,6 +287,7 @@ def login() -> RouteResponse:
             return redirect(url_for('posts')), 302
 
         flash("The Email/Password You Entered Is Invalid")
+
     return render_template("form.html", form=form, active2="active", year=year, dark_mode=dark_mode,
                            title="Log In", logged_in=current_user.is_authenticated, user=current_user), 200
 
@@ -360,9 +302,7 @@ def logout() -> RouteResponse:
 @app.route('/posts')
 def posts() -> RouteResponse:
     """Returns posts page"""
-    posts = db.session.execute(
-        db.select(Post).order_by(
-            Post.id)).scalars().all()
+    posts = get_all_posts()
     return render_template('posts.html', posts=list(reversed(posts)), active1="active", dark_mode=dark_mode, count_target=20,
                            year=year, title="Latest Posts", logged_in=current_user.is_authenticated, user=current_user), 200
 
@@ -370,36 +310,31 @@ def posts() -> RouteResponse:
 @app.route('/view-post/<id>', methods=['GET', 'POST'])
 def view_post(id: str) -> RouteResponse:
     """Returns requested post"""
-    post = db.get_or_404(Post, id)
+    post = get_post_by_id(id)
+    if not post:
+        return redirect(url_for('posts')), 302
 
-    if post:
-        posts = db.session.execute(db.select(Post).where(
-            Post.author_id == post.author_id)).scalars().all()
-        author = db.get_or_404(User, post.author_id)
-        form = CommentForm()
+    posts = get_posts_by_author(post.author_id)
+    author = get_user_by_id(post.author_id)
+    form = CommentForm()
 
-        if form.validate_on_submit():
-            if terminate():
-                return redirect(url_for('register')), 302
+    if form.validate_on_submit():  # type: ignore[untyped-function]
+        if terminate():
+            return redirect(url_for('register')), 302
 
-            if current_user.is_authenticated:
-                user = db.get_or_404(User, current_user.get_id())
+        if not current_user.is_authenticated:
+            flash('You Need to Login to Comment on Posts')
+            return redirect(url_for('login')), 302
 
-                new_comment = Comment(
-                    text=form.comment.data,
-                    author=user,
-                    post=post,
-                )
+        user = get_user_by_id(current_user.get_id())
+        add_new_comment(
+            text=form.comment.data,
+            author=user,
+            post=post,
+        )
 
-                db.session.add(new_comment)
-                db.session.commit()
-            else:
-                flash('You Need to Login to Comment on Posts')
-                return redirect(url_for('login')), 302
-        return render_template('viewer.html', comments=list(reversed(post.comments)), post=post, form=form, dark_mode=dark_mode, edit_url=url_for('edit_post', email=post.author.email, id=id), id=id, posts=list(reversed(
-            posts)), count_target=3, email=post.author.email, title=post.title, subtitle=post.subtitle, name=post.author.name, text=post.text, image=post.img_url, year=year, logged_in=current_user.is_authenticated, user=current_user, author=author), 200
-
-    return redirect(url_for('posts')), 302
+    return render_template('viewer.html', comments=list(reversed(post.comments)), post=post, form=form, dark_mode=dark_mode, edit_url=url_for('edit_post', email=post.author.email, id=id), id=id, posts=list(reversed(
+        posts)), count_target=3, email=post.author.email, title=post.title, subtitle=post.subtitle, name=post.author.name, text=post.text, image=post.img_url, year=year, logged_in=current_user.is_authenticated, user=current_user, author=author), 200
 
 
 @app.route('/create-post', methods=['GET', 'POST'])
@@ -407,40 +342,31 @@ def view_post(id: str) -> RouteResponse:
 def create_post() -> RouteResponse:
     """Post creation page / form"""
     if not current_user.admin and not current_user.premium:
-        posts = db.session.execute(db.select(Post).where(
-            Post.author_id == current_user.id)).scalars().all()
+        posts = get_posts_by_author(current_user.id)
         for post in posts:
             if post.date == date.today().strftime("%B %d, %Y"):
                 return redirect(url_for('about', email=current_user.email,
                                 message='You Can Not Make Any More Posts Today')), 302
 
     form = CreatePostForm()
-    if form.validate_on_submit():
+    if form.validate_on_submit():  # type: ignore[untyped-function]
         title_val = (form.title.data or "").title()
-        post = db.session.execute(
-            db.select(Post).where(
-                Post.title == title_val)).scalar()
+        post = get_post_by_title(title_val)
 
         if post:
             flash('A Post with that Title Already Exists')
+        elif len(form.title.data or "") > 250 or len(form.subtitle.data or "") > 250:
+            flash('The Title/Subtitle of your Post is Too Long')
         else:
-            if len(
-                    form.title.data or "") <= 250 and len(
-                    form.subtitle.data or "") <= 250:
-                new_post = Post(
-                    title=title_val,
-                    subtitle=form.subtitle.data or "",
-                    text=form.body.data or "",
-                    img_url=form.img_url.data,
-                    author=current_user,
-                    date=date.today().strftime("%B %d, %Y")
-                )
-
-                db.session.add(new_post)
-                db.session.commit()
-                return redirect(url_for("posts")), 302
-            else:
-                flash('The Title/Subtitle of your Post is Too Long')
+            add_new_post(
+                title=title_val,
+                subtitle=form.subtitle.data or "",
+                text=form.body.data or "",
+                img_url=form.img_url.data,
+                author=current_user,
+                date_str=date.today().strftime("%B %d, %Y")
+            )
+            return redirect(url_for("posts")), 302
 
     return render_template("form.html", form=form, year=year, dark_mode=dark_mode,
                            title="Create Post", logged_in=current_user.is_authenticated, user=current_user), 200
@@ -450,165 +376,158 @@ def create_post() -> RouteResponse:
 @logged_on
 def edit_post(email: str, id: str) -> RouteResponse:
     """Edit post page / form"""
-    if current_user.email == email:
-        posts = db.session.execute(
-            db.select(Post).where(
-                Post.author_id == current_user.id)).scalars().all()
-        post = db.get_or_404(Post, id)
+    if current_user.email != email:
+        return abort(403)
 
-        form = CreatePostForm(
-            title=post.title,
-            subtitle=post.subtitle,
-            img_url=post.img_url,
-            body=post.text
+    posts = get_posts_by_author(current_user.id)
+    post = get_post_by_id(id)
+
+    form = CreatePostForm(
+        title=post.title,
+        subtitle=post.subtitle,
+        img_url=post.img_url,
+        body=post.text
+    )
+
+    if form.validate_on_submit():  # type: ignore[untyped-function]
+        update_post_details(
+            post=post,
+            title=form.title.data or "",
+            subtitle=form.subtitle.data or "",
+            img_url=form.img_url.data,
+            text=form.body.data or ""
         )
+        return redirect(url_for('view_post', id=id)), 302
 
-        if form.validate_on_submit():
-            post.title = form.title.data or ""
-            post.subtitle = form.subtitle.data or ""
-            post.img_url = form.img_url.data
-            post.text = form.body.data or ""
-
-            db.session.commit()
-            return redirect(url_for('view_post', id=id)), 302
-
-        return render_template('editor.html', form=form, dark_mode=dark_mode, posts=list(reversed(posts)), count_target=3, email=current_user.email,
-                               title=current_user.name, name=current_user.name, text=current_user.about_text, year=year, logged_in=current_user.is_authenticated, user=current_user), 200
-    return abort(403)
+    return render_template('editor.html', form=form, dark_mode=dark_mode, posts=list(reversed(posts)), count_target=3, email=current_user.email,
+                           title=current_user.name, name=current_user.name, text=current_user.about_text, year=year, logged_in=current_user.is_authenticated, user=current_user), 200
 
 
 @app.route('/delete/<email>/<id>')
 @logged_on
 def delete_post(email: str, id: str) -> RouteResponse:
     """Delete post page"""
-    if current_user.email == email or current_user.admin:
-        verified: bool = bool(session.get('delete'))
-        if not verified:
-            return redirect(
-                url_for(
-                    'confirm', target=url_for(
-                        'delete_post', email=email, id=id))), 302
+    if current_user.email != email and not current_user.admin:
+        return abort(403)
 
-        post = db.get_or_404(Post, id)
-        for comment in post.comments:
-            db.session.delete(comment)
+    verified: bool = bool(session.get('delete'))
+    if not verified:
+        return redirect(
+            url_for(
+                'confirm', target=url_for(
+                    'delete_post', email=email, id=id))), 302
 
-        db.session.delete(post)
-        db.session.commit()
-        return redirect(url_for('about', email=email)), 302
-
-    return abort(403)
+    post = get_post_by_id(id)
+    if post:
+        delete_post_and_comments(post)
+    return redirect(url_for('about', email=email)), 302
 
 
 @app.route('/<email>', methods=['GET', 'POST'])
 @app.route('/<email>/<message>')
 def about(email: str, message: str = '') -> RouteResponse:
     """About page"""
-    user = db.session.execute(
-        db.select(User).where(
-            User.email == email)).scalar()
-    if user:
-        posts = db.session.execute(
-            db.select(Post).where(
-                Post.author_id == user.id)).scalars().all()
+    user = get_user_by_email(email)
+    if not user:
+        return redirect(url_for('posts')), 302
 
-        if current_user.is_authenticated:
-            form = ContactForm(
-                name=current_user.name,
-                email=current_user.email
+    posts = get_posts_by_author(user.id)
+
+    if current_user.is_authenticated:
+        form = ContactForm(
+            name=current_user.name,
+            email=current_user.email
+        )
+    else:
+        form = ContactForm()
+
+    if form.validate_on_submit():  # type: ignore[untyped-function]
+        name = form.name.data
+        from_email = form.email.data
+        phone = form.phone.data
+        mail = form.message.data
+
+        from_user = get_user_by_email(from_email)
+        if from_user:
+            sendmail = Mail(
+                from_email=EMAIL,
+                to_emails=email,
+                subject='Someone Using Career Post Has Tried to Contact You',
+                html_content=f'Name: {name}<br><br>Email: {from_email}<br><br>Phone Number: {phone}<br><br>Message:<br>{mail}'
             )
+
+            sg = SendGridAPIClient(API)
+            sg.send(sendmail)  # type: ignore[untyped-function]
+            message = 'Email Successfully Sent'
         else:
-            form = ContactForm()
+            flash("The Email You Entered Is Invalid")
 
-        if form.validate_on_submit():
-            name = form.name.data
-            from_email = form.email.data
-            phone = form.phone.data
-            mail = form.message.data
-
-            from_user = db.session.execute(
-                db.select(User).where(
-                    User.email == from_email)).scalar()
-            if from_user:
-                sendmail = Mail(
-                    from_email=EMAIL,
-                    to_emails=email,
-                    subject='Someone Using Career Post Has Tried to Contact You',
-                    html_content=f'Name: {name}<br><br>Email: {from_email}<br><br>Phone Number: {phone}<br><br>Message:<br>{mail}'
-                )
-
-                sg = SendGridAPIClient(API)
-                sg.send(sendmail)
-                message = 'Email Successfully Sent'
-            else:
-                flash("The Email You Entered Is Invalid")
-
-        return render_template('viewer.html', form=form, dark_mode=dark_mode, message=message, edit_url=url_for('edit_about', email=user.email), posts=list(reversed(
-            posts)), count_target=3, email=user.email, title=user.name, name=user.name, text=user.about_text, year=year, logged_in=current_user.is_authenticated, user=current_user, author=user), 200
-    return redirect(url_for('posts')), 302
+    return render_template('viewer.html', form=form, dark_mode=dark_mode, message=message, edit_url=url_for('edit_about', email=user.email), posts=list(reversed(
+        posts)), count_target=3, email=user.email, title=user.name, name=user.name, text=user.about_text, year=year, logged_in=current_user.is_authenticated, user=current_user, author=user), 200
 
 
 @app.route('/edit-about/<email>', methods=['GET', 'POST'])
 @logged_on
 def edit_about(email: str) -> RouteResponse:
     """Edit about page / form"""
-    if current_user.email == email:
-        posts = db.session.execute(
-            db.select(Post).where(
-                Post.author_id == current_user.id)).scalars().all()
-        form = CreateAboutForm(body=current_user.about_text)
+    if current_user.email != email:
+        return abort(403)
 
-        if form.validate_on_submit():
-            current_user.about_text = form.body.data
-            db.session.commit()
-            return redirect(url_for('about', email=email)), 302
-        return render_template('editor.html', form=form, dark_mode=dark_mode, posts=list(reversed(posts)), count_target=3, email=current_user.email,
-                               title=current_user.name, name=current_user.name, text=current_user.about_text, year=year, logged_in=current_user.is_authenticated, user=current_user), 200
-    return abort(403)
+    posts = get_posts_by_author(current_user.id)
+    form = CreateAboutForm(body=current_user.about_text)
+
+    if form.validate_on_submit():  # type: ignore[untyped-function]
+        update_user_about(current_user, form.body.data)
+        return redirect(url_for('about', email=email)), 302
+
+    return render_template('editor.html', form=form, dark_mode=dark_mode, posts=list(reversed(posts)), count_target=3, email=current_user.email,
+                           title=current_user.name, name=current_user.name, text=current_user.about_text, year=year, logged_in=current_user.is_authenticated, user=current_user), 200
 
 
 @app.route('/delete/<email>')
 @logged_on
 def delete_account(email: str) -> RouteResponse:
     """Delete account page"""
-    if current_user.email == email or current_user.admin:
-        verified: bool = bool(session.get('delete'))
-        if not verified:
-            return redirect(
-                url_for(
-                    'confirm', target=url_for(
-                        'delete_account', email=email))), 302
+    if current_user.email != email and not current_user.admin:
+        return abort(403)
 
-        user = db.session.execute(
-            db.select(User).where(
-                User.email == email)).scalar()
-        user.terminate = True
-        db.session.commit()
-
+    verified: bool = bool(session.get('delete'))
+    if not verified:
         return redirect(
             url_for(
-                'about', message="Account Deletion Pending", email=email)), 302
-    return abort(403)
+                'confirm', target=url_for(
+                    'delete_account', email=email))), 302
+
+    mark_user_for_termination(email)
+
+    return redirect(
+        url_for(
+            'about', message="Account Deletion Pending", email=email)), 302
 
 
 @app.route('/delete-comment/<id>')
 @logged_on
 def delete_comment(id: str) -> RouteResponse:
     """Delete comment page"""
-    comment = db.get_or_404(Comment, id)
-    if current_user.admin or current_user.id == comment.author_id or comment.post.author.email == current_user.email:
-        verified: bool = bool(session.get('delete'))
-        if not verified:
-            return redirect(
-                url_for(
-                    'confirm', target=url_for(
-                        'delete_comment', id=id))), 302
+    comment = get_comment_by_id(id)
+    is_authorized = (
+        current_user.admin
+        or current_user.id == comment.author_id
+        or comment.post.author.email == current_user.email
+    )
+    if not is_authorized:
+        return abort(403)
 
-        post = db.get_or_404(Post, comment.post_id)
-        db.session.delete(comment)
-        db.session.commit()
-        return redirect(url_for('view_post', id=post.id)), 302
-    return abort(403)
+    verified: bool = bool(session.get('delete'))
+    if not verified:
+        return redirect(
+            url_for(
+                'confirm', target=url_for(
+                    'delete_comment', id=id))), 302
+
+    post = get_post_by_id(comment.post_id)
+    delete_single_comment(comment)
+    return redirect(url_for('view_post', id=post.id)), 302
 
 
 @app.route('/confirm', methods=['GET', 'POST'])
@@ -619,13 +538,13 @@ def confirm() -> RouteResponse:
     if request.method == 'GET':
         return render_template('confirm.html', dark_mode=dark_mode, year=year,
                                logged_in=current_user.is_authenticated, user=current_user, post='', target=target), 200
-    elif request.method == 'POST':
-        try:
-            if request.form['delete']:
-                session['delete'] = True
-                return redirect(target), 302
-        except KeyError:
-            return redirect(url_for('posts')), 302
+
+    if request.method == 'POST':
+        if 'delete' in request.form and request.form['delete']:
+            session['delete'] = True
+            return redirect(target), 302
+        return redirect(url_for('posts')), 302
+
     return abort(403)
 
 
@@ -633,7 +552,7 @@ def confirm() -> RouteResponse:
 def search() -> RouteResponse:
     """Search results"""
     query: str = (request.args.get('query') or '').title()
-    results = Post.query.filter(Post.title.contains(query)).all()
+    results = search_posts(query)
     return render_template('posts.html', posts=list(results), dark_mode=dark_mode, count_target=20,
                            year=year, title=query, logged_in=current_user.is_authenticated, user=current_user), 200
 
@@ -660,11 +579,7 @@ def make_admin(email: str) -> RouteResponse:
                 'confirm', target=url_for(
                     'make_admin', email=email))), 302
 
-    user = db.session.execute(
-        db.select(User).where(
-            User.email == email)).scalar()
-    user.admin = True
-    db.session.commit()
+    set_user_admin(email, True)
     return redirect(url_for('about', email=email)), 302
 
 
@@ -679,11 +594,7 @@ def make_premium(email: str) -> RouteResponse:
                 'confirm', target=url_for(
                     'make_premium', email=email))), 302
 
-    user = db.session.execute(
-        db.select(User).where(
-            User.email == email)).scalar()
-    user.premium = True
-    db.session.commit()
+    set_user_premium(email, True)
     return redirect(url_for('about', email=email)), 302
 
 
@@ -698,11 +609,7 @@ def remove_admin(email: str) -> RouteResponse:
                 'confirm', target=url_for(
                     'remove_admin', email=email))), 302
 
-    user = db.session.execute(
-        db.select(User).where(
-            User.email == email)).scalar()
-    user.admin = False
-    db.session.commit()
+    set_user_admin(email, False)
     return redirect(url_for('about', email=email)), 302
 
 
@@ -717,11 +624,7 @@ def remove_premium(email: str) -> RouteResponse:
                 'confirm', target=url_for(
                     'remove_premium', email=email))), 302
 
-    user = db.session.execute(
-        db.select(User).where(
-            User.email == email)).scalar()
-    user.premium = False
-    db.session.commit()
+    set_user_premium(email, False)
     return redirect(url_for('about', email=email)), 302
 
 
