@@ -9,18 +9,18 @@
             <p class="lead mb-4">The All in One Service for All your Hiring Needs</p>
             <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
             {%if logged_in%}
-            <a href="{{url_for('create_post')}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3">Create A New Post!</button></a>
-            <a href="{{url_for('about', email=user.email)}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3">View Your About!</button></a>
+            <a href="{{url_for('posts.create_post')}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3">Create A New Post!</button></a>
+            <a href="{{url_for('main.about', email=user.email)}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3">View Your About!</button></a>
             {%else%}
               <a href="#pricing-plan" target="_parent"><button type="button" class="btn btn-primary btn-lg px-4 gap-3">Register Now!</button></a>
-              <a href="{{url_for('login')}}"><button type="button" class="btn btn-outline-secondary btn-lg px-4">Log in</button></a>
+              <a href="{{url_for('auth.login')}}"><button type="button" class="btn btn-outline-secondary btn-lg px-4">Log in</button></a>
             {%endif%}
             </div>
         </div>
     </div>
 
     <div class="container px-4 py-5">
-        <a href="{{url_for('posts')}}"><h2 class="pb-2 border-bottom text-body-emphasis">Latest Posts</h2></a>
+        <a href="{{url_for('posts.posts')}}"><h2 class="pb-2 border-bottom text-body-emphasis">Latest Posts</h2></a>
 
         <div class="row row-cols-1 row-cols-lg-3 align-items-stretch g-4 py-5">
           {%if posts%}
@@ -54,7 +54,7 @@
                 <li>No Comments</li>
                 <li>About Me Page</li>
               </ul>
-              <a href="{{url_for('register')}}"><button type="button" class="w-100 btn btn-lg btn-outline-primary">Sign up for free</button></a>
+              <a href="{{url_for('auth.register')}}"><button type="button" class="w-100 btn btn-lg btn-outline-primary">Sign up for free</button></a>
             </div>
           </div>
         </div>
@@ -70,7 +70,7 @@
                 <li>Comments Enabled</li>
                 <li>Inbuilt Contact Feature</li>
               </ul>
-              <a href="{{url_for('register', premium=True)}}"><button type="button" class="w-100 btn btn-lg btn-primary">Get started</button></a>
+              <a href="{{url_for('auth.register', premium=True)}}"><button type="button" class="w-100 btn btn-lg btn-primary">Get started</button></a>
             </div>
           </div>
         </div>
@@ -86,7 +86,7 @@
                 <li>Comments Enabled</li>
                 <li>Inbuilt Contact Feature</li>
               </ul>
-              <a href="{{url_for('register', premium=True)}}"><button type="button" class="w-100 btn btn-lg btn-primary">Donate to Us</button></a>
+              <a href="{{url_for('auth.register', premium=True)}}"><button type="button" class="w-100 btn btn-lg btn-primary">Donate to Us</button></a>
             </div>
           </div>
         </div>

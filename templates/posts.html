@@ -21,7 +21,7 @@
     {%if logged_in%}
         <div class="text-center">
             <div class="col-lg-6 mx-auto">
-                <a href="{{url_for('create_post')}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3">Create New Post</button></a>
+                <a href="{{url_for('posts.create_post')}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3">Create New Post</button></a>
             </div>
         </div>
     {%endif%}

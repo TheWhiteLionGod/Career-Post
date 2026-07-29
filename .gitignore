@@ -3,3 +3,4 @@ instance/
 __pycache__/
 .mypy_cache/
 .vscode/
+pyrightconfig.json

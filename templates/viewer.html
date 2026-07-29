@@ -11,27 +11,27 @@
           {%if title == name%}
             {%if user.admin%}
               {%if author.admin%}
-                <a href="{{url_for('remove_admin', email=email)}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3 mx-2 my-2">Remove Admin</button></a>
+                <a href="{{url_for('auth.remove_admin', email=email)}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3 mx-2 my-2">Remove Admin</button></a>
               {%else%}
-                <a href="{{url_for('make_admin', email=email)}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3 mx-2 my-2">Make Admin</button></a>
+                <a href="{{url_for('auth.make_admin', email=email)}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3 mx-2 my-2">Make Admin</button></a>
               {%endif%}
               {%if author.premium%}
-                <a href="{{url_for('remove_premium', email=email)}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3 mx-2 my-2">Remove Premium</button></a>
+                <a href="{{url_for('auth.remove_premium', email=email)}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3 mx-2 my-2">Remove Premium</button></a>
               {%else%}
-                <a href="{{url_for('make_premium', email=email)}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3 mx-2 my-2">Make Premium</button></a>
+                <a href="{{url_for('auth.make_premium', email=email)}}"><button type="button" class="btn btn-primary btn-lg px-4 gap-3 mx-2 my-2">Make Premium</button></a>
               {%endif%}
-              <a href="{{url_for('delete_account', email=email)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2 my-2">Delete Account</button></a>
+              <a href="{{url_for('auth.delete_account', email=email)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2 my-2">Delete Account</button></a>
             {%else%}
               {%if author.email == user.email%}
-                <a href="{{url_for('delete_account', email=email)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2 my-2">Delete Account</button></a>            
+                <a href="{{url_for('auth.delete_account', email=email)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2 my-2">Delete Account</button></a>            
               {%endif%}
             {%endif%}
           {%else%}
             {%if user.email == email%}
-              <a href="{{url_for('delete_post', email=email, id=id)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2 my-2">Delete Post</button></a>
+              <a href="{{url_for('posts.delete_post', email=email, id=id)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2 my-2">Delete Post</button></a>
             {%else%}
               {%if user.admin%}
-                <a href="{{url_for('delete_post', email=email, id=id)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2 my-2">Delete Post</button></a>
+                <a href="{{url_for('posts.delete_post', email=email, id=id)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2 my-2">Delete Post</button></a>
               {%endif%}
             {%endif%}
           {%endif%}
@@ -47,7 +47,7 @@
                 {{subtitle}}
                 <br>
                 By 
-                <a href="{{url_for('about', email=email)}}" style="text-decoration: underline; color: rgb(97, 192, 224);">{{name}}</a>
+                <a href="{{url_for('main.about', email=email)}}" style="text-decoration: underline; color: rgb(97, 192, 224);">{{name}}</a>
               </p>
           </div>
         {%endif%}
@@ -116,15 +116,15 @@
                 {%if title != name%}
                   {%if user.admin%}
                     <li class="mt-2">
-                      <a href="{{url_for('delete_comment', id=comment.id)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2">Delete Comment</button></a>
+                      <a href="{{url_for('posts.delete_comment', id=comment.id)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2">Delete Comment</button></a>
                     </li>
                   {%elif user.email == email%}
                     <li class="mt-2">
-                      <a href="{{url_for('delete_comment', id=comment.id)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2">Delete Comment</button></a>
+                      <a href="{{url_for('posts.delete_comment', id=comment.id)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2">Delete Comment</button></a>
                     </li>
                   {%elif user.id == comment.author_id%}
                     <li class="mt-2">
-                      <a href="{{url_for('delete_comment', id=comment.id)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2">Delete Comment</button></a>
+                      <a href="{{url_for('posts.delete_comment', id=comment.id)}}"><button type="button" class="btn btn-danger btn-lg px-4 gap-3 mx-2">Delete Comment</button></a>
                     </li>
                   {%endif%}
                 {%endif%}
